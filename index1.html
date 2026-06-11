@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Myopia Axial Length Progression Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#ffffff; --bg2:#f5f5f3; --bg3:#ebebea;
+  --text:#1a1a18; --text2:#5c5c58; --text3:#9a9990;
+  --border:rgba(0,0,0,0.09); --border2:rgba(0,0,0,0.17);
+  --blue:#185FA5; --blue2:#378ADD;
+  --green:#3B6D11; --green2:#639922;
+  --amber:#854F0B; --red:#A32D2D; --red2:#E24B4A; --coral:#D85A30;
+  --re:#185FA5; --re2:#378ADD;
+  --le:#854F0B; --le2:#EF9F27;
+  --r:8px; --rl:12px; --font:'DM Sans','Segoe UI',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1a; --bg2:#252523; --bg3:#2f2f2c;
+    --text:#eeeee8; --text2:#a8a79f; --text3:#6a6963;
+    --border:rgba(255,255,255,0.09); --border2:rgba(255,255,255,0.17);
+  }
+}
+html{font-size:15px;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;padding:1.75rem 1rem 3rem;}
+.page{max-width:900px;margin:0 auto;}
+
+.ph{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:0.5px solid var(--border2);flex-wrap:wrap;}
+.ph h1{font-size:1.2rem;font-weight:600;letter-spacing:-0.02em;}
+.ph p{font-size:.78rem;color:var(--text3);}
+
+.search-bar{display:flex;gap:8px;align-items:center;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--rl);padding:.85rem 1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+.search-bar label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);white-space:nowrap;}
+.search-bar input{font-family:var(--font);font-size:.9rem;font-weight:500;color:var(--text);background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r);padding:7px 11px;outline:none;width:180px;letter-spacing:.05em;}
+.search-bar input:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(55,138,221,.13);}
+.search-bar .hint{font-size:.72rem;color:var(--text3);flex:1;}
+
+#patientPanel{display:none;}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1.1rem;}
+.field{display:flex;flex-direction:column;gap:3px;}
+.field label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
+.field input,.field select{font-family:var(--font);font-size:.83rem;color:var(--text);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 9px;outline:none;transition:border-color .15s,box-shadow .15s;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(55,138,221,.13);}
+
+.id-display{display:inline-flex;align-items:center;gap:8px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 12px;margin-bottom:1rem;}
+.id-display .id-label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
+.id-display .id-val{font-size:1rem;font-weight:600;letter-spacing:.08em;color:var(--text);}
+.id-status{font-size:.65rem;padding:2px 7px;border-radius:999px;font-weight:600;}
+.id-new{background:#EAF3DE;color:#3B6D11;}
+.id-loaded{background:#E6F1FB;color:#185FA5;}
+@media(prefers-color-scheme:dark){
+  .id-new{background:#27500A;color:#C0DD97;}
+  .id-loaded{background:#0C447C;color:#B5D4F4;}
+}
+
+.record-list{margin-top:.5rem;}
+.record-item{display:flex;align-items:center;gap:10px;padding:.6rem .85rem;border-radius:var(--r);border:0.5px solid var(--border);background:var(--bg2);margin-bottom:5px;cursor:pointer;transition:background .12s;}
+.record-item:hover{background:var(--bg3);}
+.record-item .ri-id{font-size:.85rem;font-weight:600;letter-spacing:.06em;color:var(--text);min-width:90px;}
+.record-item .ri-info{font-size:.75rem;color:var(--text2);flex:1;}
+.record-item .ri-date{font-size:.7rem;color:var(--text3);}
+
+.sl{font-size:.64rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:1rem 0 .4rem;}
+
+/* Eye tabs */
+.eye-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;}
+.eye-panel{border:0.5px solid var(--border2);border-radius:var(--rl);padding:.85rem 1rem;}
+.eye-panel.re-panel{border-left:3px solid var(--re2);}
+.eye-panel.le-panel{border-left:3px solid var(--le2);}
+.eye-title{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem;display:flex;align-items:center;gap:6px;}
+.re-dot{width:8px;height:8px;border-radius:50%;background:var(--re2);display:inline-block;}
+.le-dot{width:8px;height:8px;border-radius:50%;background:var(--le2);display:inline-block;}
+.eye-entries{margin-bottom:5px;}
+.erow{display:grid;grid-template-columns:140px 110px 1fr auto;gap:5px;align-items:center;margin-bottom:4px;}
+.erow input{font-family:var(--font);font-size:.8rem;color:var(--text);background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r);padding:5px 7px;outline:none;width:100%;}
+.erow input:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(55,138,221,.12);}
+.add-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.add-row input{font-family:var(--font);font-size:.8rem;color:var(--text);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;outline:none;}
+.add-row input[type=date]{width:140px;}
+.add-row input[type=number]{width:120px;}
+.add-row input:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(55,138,221,.12);}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:8px;margin-bottom:1.1rem;}
+.stat{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r);padding:.6rem .8rem;}
+.stat .sl2{font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:3px;}
+.stat .sv{font-size:1.05rem;font-weight:600;color:var(--text);line-height:1.2;}
+.stat .sv span{font-size:.68rem;font-weight:400;color:var(--text2);}
+.stat .sv2{font-size:.82rem;font-weight:500;color:var(--text2);margin-top:2px;}
+.eye-stat-row{display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;}
+
+.b{display:inline-block;font-size:.6rem;font-weight:600;padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;}
+.b-low{background:#EAF3DE;color:#3B6D11;}
+.b-mod{background:#FAEEDA;color:#854F0B;}
+.b-high{background:#FCEBEB;color:#A32D2D;}
+.b-vhi{background:#F7C1C1;color:#791F1F;}
+@media(prefers-color-scheme:dark){
+  .b-low{background:#27500A;color:#C0DD97;}
+  .b-mod{background:#633806;color:#FAC775;}
+  .b-high{background:#791F1F;color:#F09595;}
+  .b-vhi{background:#501313;color:#F7C1C1;}
+}
+
+button{font-family:var(--font);font-size:.82rem;font-weight:500;color:var(--text);background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 14px;cursor:pointer;transition:background .12s,transform .1s;white-space:nowrap;}
+button:hover{background:var(--bg3);}
+button:active{transform:scale(0.97);}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-p:hover{background:var(--blue2);border-color:var(--blue2);}
+.btn-re{background:var(--re);color:#fff;border-color:var(--re);font-size:.75rem;padding:5px 10px;}
+.btn-re:hover{background:var(--re2);border-color:var(--re2);}
+.btn-le{background:var(--le);color:#fff;border-color:var(--le);font-size:.75rem;padding:5px 10px;}
+.btn-le:hover{background:var(--le2);border-color:var(--le2);}
+.btn-rm{padding:3px 8px;font-size:.7rem;color:var(--text3);background:transparent;border-color:var(--border);}
+.btn-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem;}
+.btn-danger{color:var(--red);border-color:rgba(163,45,45,.3);}
+.btn-danger:hover{background:#FCEBEB;color:var(--red);}
+@media(prefers-color-scheme:dark){.btn-danger:hover{background:#501313;}}
+
+.legend{display:flex;flex-wrap:wrap;gap:9px 14px;margin-bottom:8px;font-size:.7rem;color:var(--text2);}
+.legend span{display:flex;align-items:center;gap:5px;}
+.lsq{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
+.ll{width:18px;height:0;border-top:2.5px solid currentColor;display:inline-block;flex-shrink:0;}
+.lld{width:18px;height:0;border-top:2px dashed currentColor;display:inline-block;flex-shrink:0;}
+.chart-wrap{position:relative;width:100%;height:420px;margin-bottom:.75rem;}
+
+.save-indicator{font-size:.7rem;color:var(--text3);display:flex;align-items:center;gap:5px;transition:opacity .4s;}
+.save-dot{width:6px;height:6px;border-radius:50%;background:var(--green2);}
+
+.cit-panel{margin-top:1.75rem;border-top:0.5px solid var(--border2);padding-top:1.1rem;}
+.cit-panel summary{cursor:pointer;font-size:.78rem;font-weight:600;color:var(--text2);list-style:none;display:flex;align-items:center;gap:6px;}
+.cit-panel summary::before{content:'▶';font-size:.6rem;color:var(--text3);transition:transform .2s;}
+details[open] summary::before{transform:rotate(90deg);}
+.cit-body{margin-top:.9rem;}
+.cit-item{margin-bottom:1rem;padding-bottom:.9rem;border-bottom:0.5px solid var(--border);}
+.cit-item:last-child{border-bottom:none;margin-bottom:0;}
+.cit-item h4{font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:.25rem;}
+.cit-item p{font-size:.74rem;color:var(--text2);line-height:1.55;}
+.cit-item a{color:var(--blue2);text-decoration:none;}
+.cit-item a:hover{text-decoration:underline;}
+.cit-tag{display:inline-block;font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;margin-right:4px;margin-bottom:4px;}
+.ct-eu{background:#E6F1FB;color:#185FA5;}
+.ct-cn{background:#FAEEDA;color:#854F0B;}
+.ct-imi{background:#EAF3DE;color:#3B6D11;}
+.ct-uk{background:#EEEDFE;color:#3C3489;}
+@media(prefers-color-scheme:dark){
+  .ct-eu{background:#0C447C;color:#B5D4F4;}
+  .ct-cn{background:#633806;color:#FAC775;}
+  .ct-imi{background:#27500A;color:#C0DD97;}
+  .ct-uk{background:#26215C;color:#CECBF6;}
+}
+.pop-note{font-size:.7rem;color:var(--text2);background:var(--bg2);border-radius:var(--r);padding:.5rem .75rem;margin-top:.5rem;border-left:2.5px solid var(--blue2);}
+.divider{border:none;border-top:0.5px solid var(--border);margin:1.25rem 0;}
+
+@media print{.add-row,.btn-bar,.erow button,.cit-panel,.search-bar,.record-list,.save-indicator{display:none!important;}.chart-wrap{height:360px;}}
+@media(max-width:640px){.eye-tabs{grid-template-columns:1fr;}.erow{grid-template-columns:1fr 1fr auto auto;}.erow .badge-cell{display:none;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="ph">
+  <div>
+    <h1>Myopia axial length progression monitor</h1>
+    <p>Patient data superimposed on published normative percentile curves</p>
+  </div>
+  <div class="save-indicator" id="saveInd" style="opacity:0;">
+    <div class="save-dot"></div><span>Saved</span>
+  </div>
+</div>
+
+<!-- ID search -->
+<div class="search-bar">
+  <label>Patient ID</label>
+  <input type="text" id="idInput" placeholder="e.g. TH-0042" autocomplete="off"
+    oninput="onIdInput()" onkeydown="if(event.key==='Enter')loadOrCreate()" />
+  <button class="btn-p" onclick="loadOrCreate()">Load / new</button>
+  <span class="hint" id="searchHint">Enter a patient ID to load an existing record or start a new one.</span>
+</div>
+
+<!-- Recent records -->
+<div id="recentSection">
+  <div class="sl">Recent records</div>
+  <div class="record-list" id="recordList"><div style="font-size:.78rem;color:var(--text3);padding:.4rem 0;">No saved records yet.</div></div>
+</div>
+
+<!-- Patient panel -->
+<div id="patientPanel">
+
+  <div class="id-display">
+    <span class="id-label">ID</span>
+    <span class="id-val" id="displayId">—</span>
+    <span class="id-status" id="idStatus">New</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="field">
+      <label>Month &amp; year of birth</label>
+      <input type="month" id="pDob" />
+    </div>
+    <div class="field"><label>Sex</label>
+      <select id="pSex">
+        <option value="mixed">Unspecified / mixed</option>
+        <option value="female">Female</option>
+        <option value="male">Male</option>
+      </select>
+    </div>
+    <div class="field"><label>Reference population</label>
+      <select id="pPop" onchange="refresh()">
+        <option value="eu">European (Tideman 2018)</option>
+        <option value="cn">Chinese / East Asian (Sanz Diez 2019)</option>
+      </select>
+    </div>
+    <div class="field"><label>MC treatment</label>
+      <select id="pTx">
+        <option>None</option>
+        <option>Atropine 0.01%</option>
+        <option>Atropine 0.05%</option>
+        <option>MiSight lenses</option>
+        <option>Ortho-K</option>
+        <option>MC spectacles</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes</label>
+      <input type="text" id="pNotes" placeholder="Optional free text" />
+    </div>
+  </div>
+
+  <div id="popNote" class="pop-note"></div>
+
+  <!-- Dual eye measurement panels -->
+  <div class="sl">Axial length measurements</div>
+  <div class="eye-tabs">
+
+    <!-- RIGHT EYE -->
+    <div class="eye-panel re-panel">
+      <div class="eye-title"><span class="re-dot"></span>Right eye (RE)</div>
+      <div class="eye-entries" id="entryListRE"></div>
+      <div class="add-row">
+        <input type="date" id="aDateRE" aria-label="RE date" />
+        <input type="number" id="aALRE" placeholder="AL mm" step="0.01" min="19" max="32" aria-label="RE AL mm" />
+        <button class="btn-re" onclick="addMeas('RE')">+ Add</button>
+      </div>
+    </div>
+
+    <!-- LEFT EYE -->
+    <div class="eye-panel le-panel">
+      <div class="eye-title"><span class="le-dot"></span>Left eye (LE)</div>
+      <div class="eye-entries" id="entryListLE"></div>
+      <div class="add-row">
+        <input type="date" id="aDateLE" aria-label="LE date" />
+        <input type="number" id="aALLE" placeholder="AL mm" step="0.01" min="19" max="32" aria-label="LE AL mm" />
+        <button class="btn-le" onclick="addMeas('LE')">+ Add</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="statsRow"></div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <span><span class="ll" style="color:#185FA5;"></span>RE axial length</span>
+    <span><span class="ll" style="color:#EF9F27;"></span>LE axial length</span>
+    <span><span class="ll" style="color:#639922;"></span>50th %ile (median)</span>
+    <span><span class="lsq" style="background:rgba(234,243,222,.8);border:1px solid #97C459;"></span>25–75th %ile</span>
+    <span><span class="lsq" style="background:rgba(250,238,218,.8);border:1px solid #EF9F27;"></span>75–90th %ile</span>
+    <span><span class="lsq" style="background:rgba(252,235,235,.8);border:1px solid #F09595;"></span>&gt;90th %ile</span>
+    <span><span class="lld" style="color:#E24B4A;"></span>26 mm</span>
+    <span id="projLeg" style="display:none;"><span class="lld" style="color:#D85A30;"></span>Projection</span>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="mainChart" role="img" aria-label="Axial length progression chart with RE and LE data on normative percentile bands"></canvas>
+  </div>
+
+  <div class="btn-bar">
+    <button onclick="saveRecord()">Save record</button>
+    <button id="projBtn" onclick="toggleProj()">Show 1-yr projection</button>
+    <button onclick="window.print()">Print / save PDF</button>
+    <button onclick="copyReport()">Copy text report</button>
+    <button class="btn-danger" onclick="deleteRecord()">Delete record</button>
+  </div>
+
+</div>
+
+<hr class="divider" />
+
+<details class="cit-panel">
+  <summary>Evidence base &amp; reference data sources</summary>
+  <div class="cit-body">
+    <div class="cit-item">
+      <h4><span class="cit-tag ct-eu">European normative curves</span> Tideman et al. (2018)</h4>
+      <p><strong>Tideman JWL, Polling JR, Vingerling JR, Jaddoe VWV, Williams C, Guggenheim JA, Klaver CCW.</strong> Axial length growth and the risk of developing myopia in European children. <em>Acta Ophthalmologica.</em> 2018;96(3):301–309. <a href="https://doi.org/10.1111/aos.13603" target="_blank" rel="noopener">doi:10.1111/aos.13603</a></p>
+      <p style="margin-top:.4rem;">Primary source for European percentile bands. 12,386 participants across Generation R (Dutch children aged 6 and 9y; n=6,934), ALSPAC (British children 15y; n=2,495), and Rotterdam Study III. Published anchor values: mean (SD) 22.36 (0.75) mm at age 6; 23.10 (0.84) mm at age 9; 23.41 (0.86) mm at age 15. Percentile bands derived from mean ± Z·SD at each anchor, interpolated continuously between ages 6–18.</p>
+    </div>
+    <div class="cit-item">
+      <h4><span class="cit-tag ct-cn">East Asian normative curves</span> Sanz Diez et al. (2019)</h4>
+      <p><strong>Sanz Diez P, Yang L-H, Lu M-X, Wahl S, Ohlendorf A.</strong> Growth curves of myopia-related parameters to clinically monitor the refractive development in Chinese schoolchildren. <em>Graefe's Archive for Clinical and Experimental Ophthalmology.</em> 2019;257(8):1045–1053. <a href="https://doi.org/10.1007/s00417-019-04290-6" target="_blank" rel="noopener">doi:10.1007/s00417-019-04290-6</a></p>
+      <p style="margin-top:.4rem;">Source for East Asian/Chinese percentile bands. 12,554 children (6,054 girls, 6,500 boys) aged 5–16 years from Wuhan, China (Lenstar LS 900). Chinese children have substantially longer axial lengths than European children at equivalent ages; difference increases with age.</p>
+    </div>
+    <div class="cit-item">
+      <h4><span class="cit-tag ct-imi">26 mm threshold</span> IMI White Papers (2019)</h4>
+      <p><strong>Flitcroft DI, He M, Jonas JB et al.</strong> IMI — Defining and classifying myopia. <em>Invest Ophthalmol Vis Sci.</em> 2019;60(3):M20–M30. <a href="https://doi.org/10.1167/iovs.18-25957" target="_blank" rel="noopener">doi:10.1167/iovs.18-25957</a></p>
+      <p style="margin-top:.4rem;">Source for the 26 mm axial length threshold. High myopia defined as ≤−6.00 D, corresponding to approximately 26 mm AL. Above this threshold, risk of myopic maculopathy, retinal detachment, glaucoma, and cataract rises substantially.</p>
+    </div>
+    <div class="cit-item">
+      <h4><span class="cit-tag ct-uk">UK clinical guidance</span> College of Optometrists (2023)</h4>
+      <p>Clinical Management Guidelines: Myopia in children and young people. London: College of Optometrists; updated 2023. <a href="https://www.college-optometrists.org/clinical-guidance/clinical-management-guidelines/myopia" target="_blank" rel="noopener">college-optometrists.org</a></p>
+      <p style="margin-top:.4rem;">Informs progression rate thresholds: slow ≤0.10 mm/yr; moderate 0.10–0.20 mm/yr; fast 0.20–0.30 mm/yr; very fast &gt;0.30 mm/yr.</p>
+    </div>
+    <div class="cit-item">
+      <h4><span class="cit-tag ct-eu">Treatment efficacy</span> Brennan et al. (2021)</h4>
+      <p><strong>Brennan NA, Toubouti YM, Cheng X, Bullimore MA.</strong> Efficacy in myopia control. <em>Progress in Retinal and Eye Research.</em> 2021;83:100923. <a href="https://doi.org/10.1016/j.preteyeres.2020.100923" target="_blank" rel="noopener">doi:10.1016/j.preteyeres.2020.100923</a></p>
+      <p style="margin-top:.4rem;">Meta-analysis confirming mean untreated axial elongation in childhood myopia typically falls 0.20–0.30 mm/yr, supporting the progression thresholds used in this tool.</p>
+    </div>
+    <div style="margin-top:1rem;font-size:.72rem;color:var(--text3);background:var(--bg2);border-radius:var(--r);padding:.6rem .85rem;">
+      <strong>Important limitations:</strong> Percentile curves are population references, not individual risk predictors. The Tideman (2018) data are available only at discrete ages (6, 9, 15 years); values between these ages are interpolated. Ethnic, geographic, and cohort variation means curves are indicative — clinical judgement is always required. This tool is a clinical aid and does not replace a full optometric examination. Patient records are stored locally in this browser only.
+    </div>
+  </div>
+</details>
+
+</div>
+
+<script>
+const EU={
+  label:'European (Tideman et al., 2018)',
+  note:'Reference: European children, mixed sex. Anchored on Tideman 2018: mean (SD) 22.36 (0.75) mm at age 6; 23.10 (0.84) mm at age 9; 23.41 (0.86) mm at age 15. Percentiles derived from mean ± Z·SD at each anchor, interpolated between ages 6–18.',
+  p10:[21.39,21.74,22.03,22.02,22.08,22.13,22.17,22.19,22.21,22.31,22.31,22.31,22.31],
+  p25:[21.85,22.23,22.56,22.53,22.62,22.70,22.77,22.81,22.85,22.83,22.83,22.83,22.83],
+  p50:[22.36,22.81,23.21,23.10,23.23,23.30,23.36,23.38,23.40,23.41,23.43,23.45,23.47],
+  p75:[22.87,23.38,23.86,23.67,23.84,23.93,24.00,24.06,24.12,24.00,24.03,24.07,24.11],
+  p90:[23.32,23.89,24.43,24.18,24.40,24.54,24.66,24.80,24.95,24.52,24.61,24.73,24.85],
+};
+const CN={
+  label:'East Asian / Chinese (Sanz Diez et al., 2019)',
+  note:'Reference: Chinese children, mixed sex. 12,554 participants, Wuhan, China (Lenstar LS 900). Chinese children have substantially longer axial lengths than European children at equivalent ages.',
+  p10:[21.85,22.45,22.95,23.24,23.55,23.78,23.95,24.07,24.15,24.20,24.20,24.20,24.20],
+  p25:[22.31,22.95,23.49,23.72,24.08,24.35,24.55,24.70,24.81,24.88,24.90,24.90,24.90],
+  p50:[22.77,23.45,24.03,24.02,24.40,24.70,24.95,25.15,25.30,24.69,24.72,24.75,24.78],
+  p75:[23.23,23.95,24.57,24.52,24.97,25.32,25.60,25.82,26.00,25.50,25.58,25.65,25.72],
+  p90:[23.69,24.46,25.11,25.02,25.54,25.94,26.26,26.52,26.72,26.31,26.44,26.54,26.64],
+};
+const AGES=[6,7,8,9,10,11,12,13,14,15,16,17,18];
+
+// RE = blue, LE = amber
+const RE_COLOR='#185FA5', RE_COLOR2='#378ADD';
+const LE_COLOR='#854F0B', LE_COLOR2='#EF9F27';
+
+let currentId=null;
+let measurementsRE=[];
+let measurementsLE=[];
+let showProj=false;
+let chartInst=null;
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+async function storeGet(key){try{const r=await window.storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}}
+async function storeSet(key,val){try{await window.storage.set(key,JSON.stringify(val));return true;}catch(e){return false;}}
+async function storeDel(key){try{await window.storage.delete(key);return true;}catch(e){return false;}}
+async function storeList(prefix){try{const r=await window.storage.list(prefix);return r?r.keys:[];}catch(e){return[];}}
+function recKey(id){return'pt:'+id.toUpperCase();}
+
+// ── DOB helpers — month-year only ────────────────────────────────────────────
+function getDobDate(){
+  const v=document.getElementById('pDob').value;
+  if(!v) return null;
+  // input type=month gives "YYYY-MM" — treat as 15th of that month
+  return new Date(v+'-15T00:00:00');
+}
+
+function ageAt(dateStr){
+  const dob=getDobDate();
+  return dob?(new Date(dateStr+'T00:00:00')-dob)/(1000*60*60*24*365.25):null;
+}
+
+// ── Normative ─────────────────────────────────────────────────────────────────
+function getNorms(){return document.getElementById('pPop').value==='cn'?CN:EU;}
+
+function interp(arr,age){
+  if(age<=AGES[0]) return arr[0];
+  if(age>=AGES[AGES.length-1]) return arr[arr.length-1];
+  for(let i=0;i<AGES.length-1;i++){
+    if(age>=AGES[i]&&age<=AGES[i+1]){
+      const t=(age-AGES[i])/(AGES[i+1]-AGES[i]);
+      return arr[i]+t*(arr[i+1]-arr[i]);
+    }
+  }
+  return arr[arr.length-1];
+}
+
+function pctOf(al,age){
+  const N=getNorms();
+  const p25=interp(N.p25,age),p50=interp(N.p50,age),p75=interp(N.p75,age),p90=interp(N.p90,age);
+  if(al<=p25) return{text:'Low-normal',cls:'b-low',band:'<25th'};
+  if(al<=p50) return{text:'Normal',cls:'b-low',band:'25–50th'};
+  if(al<=p75) return{text:'Above average',cls:'b-mod',band:'50–75th'};
+  if(al<=p90) return{text:'Elevated',cls:'b-mod',band:'75–90th'};
+  return{text:'High risk',cls:'b-high',band:'>90th'};
+}
+
+function rCls(r){if(!r)return'';if(r<=0.10)return'b-low';if(r<=0.20)return'b-mod';if(r<=0.30)return'b-high';return'b-vhi';}
+function rLbl(r){if(!r)return'—';if(r<=0.10)return'Slow';if(r<=0.20)return'Moderate';if(r<=0.30)return'Fast';return'Very fast';}
+
+function sortedM(eye){
+  const m=eye==='RE'?measurementsRE:measurementsLE;
+  return[...m].sort((a,b)=>new Date(a.date)-new Date(b.date));
+}
+
+function overallRate(eye){
+  const s=sortedM(eye);if(s.length<2)return null;
+  const yrs=(new Date(s[s.length-1].date)-new Date(s[0].date))/(1000*60*60*24*365.25);
+  return yrs>0?(s[s.length-1].al-s[0].al)/yrs:null;
+}
+
+function recentRate(eye){
+  const s=sortedM(eye);if(s.length<2)return null;
+  const last=s[s.length-1],prev=s[s.length-2];
+  const yrs=(new Date(last.date)-new Date(prev.date))/(1000*60*60*24*365.25);
+  return yrs>0?(last.al-prev.al)/yrs:null;
+}
+
+// ── Record list ───────────────────────────────────────────────────────────────
+async function loadRecordList(){
+  const keys=await storeList('pt:');
+  const el=document.getElementById('recordList');
+  if(!keys.length){el.innerHTML='<div style="font-size:.78rem;color:var(--text3);padding:.4rem 0;">No saved records yet.</div>';return;}
+  const records=[];
+  for(const k of keys){const data=await storeGet(k);if(data)records.push({key:k,id:k.replace('pt:',''),data});}
+  records.sort((a,b)=>(b.data.updatedAt||0)-(a.data.updatedAt||0));
+  el.innerHTML=records.map(r=>{
+    const re=r.data.measurementsRE||[],le=r.data.measurementsLE||[];
+    const latRE=re.length?'RE '+re[re.length-1].al.toFixed(2):'';
+    const latLE=le.length?'LE '+le[le.length-1].al.toFixed(2):'';
+    const info=[latRE,latLE].filter(Boolean).join(' · ')||'No measurements';
+    const updated=r.data.updatedAt?new Date(r.data.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+    return`<div class="record-item" onclick="selectRecord('${r.id}')">
+      <span class="ri-id">${r.id}</span>
+      <span class="ri-info">${info} mm</span>
+      <span class="ri-date">${updated}</span>
+    </div>`;
+  }).join('');
+}
+
+async function selectRecord(id){document.getElementById('idInput').value=id;await loadOrCreate();}
+
+async function loadOrCreate(){
+  const raw=document.getElementById('idInput').value.trim();
+  if(!raw){alert('Please enter a patient ID.');return;}
+  const id=raw.toUpperCase();
+  currentId=id;
+  document.getElementById('displayId').textContent=id;
+  const existing=await storeGet(recKey(id));
+  if(existing){
+    populateForm(existing);
+    document.getElementById('idStatus').textContent='Loaded';
+    document.getElementById('idStatus').className='id-status id-loaded';
+  } else {
+    clearForm();
+    document.getElementById('idStatus').textContent='New record';
+    document.getElementById('idStatus').className='id-status id-new';
+  }
+  document.getElementById('patientPanel').style.display='block';
+  document.getElementById('recentSection').style.display='none';
+  refresh();
+}
+
+function onIdInput(){document.getElementById('searchHint').textContent='Press Enter or click Load / new.';}
+
+// ── Form ──────────────────────────────────────────────────────────────────────
+function populateForm(data){
+  measurementsRE=data.measurementsRE||[];
+  measurementsLE=data.measurementsLE||[];
+  document.getElementById('pDob').value=data.dob||'';
+  document.getElementById('pSex').value=data.sex||'mixed';
+  document.getElementById('pPop').value=data.pop||'eu';
+  document.getElementById('pTx').value=data.tx||'None';
+  document.getElementById('pNotes').value=data.notes||'';
+}
+
+function clearForm(){
+  measurementsRE=[];measurementsLE=[];
+  document.getElementById('pDob').value='';
+  document.getElementById('pSex').value='mixed';
+  document.getElementById('pPop').value='eu';
+  document.getElementById('pTx').value='None';
+  document.getElementById('pNotes').value='';
+}
+
+function getFormData(){
+  return{
+    dob:document.getElementById('pDob').value,
+    sex:document.getElementById('pSex').value,
+    pop:document.getElementById('pPop').value,
+    tx:document.getElementById('pTx').value,
+    notes:document.getElementById('pNotes').value,
+    measurementsRE:[...measurementsRE],
+    measurementsLE:[...measurementsLE],
+    updatedAt:Date.now(),
+  };
+}
+
+// ── Save / delete ─────────────────────────────────────────────────────────────
+async function saveRecord(){
+  if(!currentId){alert('No patient ID loaded.');return;}
+  const ok=await storeSet(recKey(currentId),getFormData());
+  if(ok){const ind=document.getElementById('saveInd');ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',2000);}
+  else alert('Save failed. Storage may not be available in this context.');
+}
+
+async function deleteRecord(){
+  if(!currentId)return;
+  if(!confirm('Delete record '+currentId+'? This cannot be undone.'))return;
+  await storeDel(recKey(currentId));
+  currentId=null;
+  document.getElementById('patientPanel').style.display='none';
+  document.getElementById('recentSection').style.display='block';
+  document.getElementById('idInput').value='';
+  document.getElementById('searchHint').textContent='Enter a patient ID to load an existing record or start a new one.';
+  await loadRecordList();
+}
+
+// ── Entries ───────────────────────────────────────────────────────────────────
+function renderEntries(eye){
+  const s=sortedM(eye);
+  const el=document.getElementById('entryList'+eye);
+  el.innerHTML=s.map((m,i)=>{
+    const age=ageAt(m.date);
+    const pct=(age!==null&&age>=3)?pctOf(m.al,age):null;
+    return`<div class="erow">
+      <input type="date" value="${m.date}" onchange="updM('${eye}',${i},'date',this.value)" />
+      <input type="number" value="${m.al.toFixed(2)}" step="0.01" min="19" max="32" onchange="updM('${eye}',${i},'al',parseFloat(this.value))" />
+      <div class="badge-cell">${pct?`<span class="b ${pct.cls}">${pct.text}</span>`:''}</div>
+      <button class="btn-rm" onclick="remM('${eye}',${i})" aria-label="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updM(eye,idx,field,val){
+  const s=sortedM(eye),t=s[idx];
+  const arr=eye==='RE'?measurementsRE:measurementsLE;
+  const i=arr.findIndex(m=>m.date===t.date&&m.al===t.al);
+  if(i>=0){arr[i][field]=val;refresh();}
+}
+
+function remM(eye,idx){
+  const s=sortedM(eye),t=s[idx];
+  if(eye==='RE') measurementsRE=measurementsRE.filter(m=>!(m.date===t.date&&m.al===t.al));
+  else measurementsLE=measurementsLE.filter(m=>!(m.date===t.date&&m.al===t.al));
+  refresh();
+}
+
+function addMeas(eye){
+  const d=document.getElementById('aDate'+eye).value;
+  const v=parseFloat(document.getElementById('aAL'+eye).value);
+  if(!d||isNaN(v)||v<19||v>32){alert('Please enter a valid date and axial length (19–32 mm).');return;}
+  if(eye==='RE') measurementsRE.push({date:d,al:v});
+  else measurementsLE.push({date:d,al:v});
+  document.getElementById('aDate'+eye).value='';
+  document.getElementById('aAL'+eye).value='';
+  refresh();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function eyeStatBlock(eye,color){
+  const s=sortedM(eye);
+  if(!s.length) return`<div style="font-size:.72rem;color:var(--text3);">No ${eye} data</div>`;
+  const lat=s[s.length-1],age=ageAt(lat.date);
+  const pct=(age!==null&&age>=3)?pctOf(lat.al,age):null;
+  const ov=overallRate(eye),rec=recentRate(eye);
+  return`<div style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:${color};margin-bottom:3px;">${eye}</div>
+  <div style="font-size:.95rem;font-weight:600;">${lat.al.toFixed(2)} mm ${pct?`<span class="b ${pct.cls}">${pct.band}</span>`:''}</div>
+  <div style="font-size:.72rem;color:var(--text2);margin-top:2px;">Rate: ${ov!==null?ov.toFixed(2)+' mm/yr':'-'} overall${rec!==null?' · '+rec.toFixed(2)+' recent':''}</div>`;
+}
+
+function renderStats(){
+  const el=document.getElementById('statsRow');
+  const reHasData=measurementsRE.length>0,leHasData=measurementsLE.length>0;
+  if(!reHasData&&!leHasData){el.innerHTML='';return;}
+  el.innerHTML=`
+    <div class="stat" style="border-left:3px solid ${RE_COLOR2};">${eyeStatBlock('RE',RE_COLOR)}</div>
+    <div class="stat" style="border-left:3px solid ${LE_COLOR2};">${eyeStatBlock('LE',LE_COLOR)}</div>`;
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function renderChart(){
+  const N=getNorms();
+  const sRE=sortedM('RE'),sLE=sortedM('LE');
+
+  function toPlot(s){return s.map(m=>{const a=ageAt(m.date);return a!==null?{x:parseFloat(a.toFixed(3)),y:m.al}:null;}).filter(Boolean);}
+  const pdRE=toPlot(sRE),pdLE=toPlot(sLE);
+
+  const allData=[...pdRE,...pdLE];
+  const maxAgeD=allData.length?Math.max(...allData.map(d=>d.x)):14;
+  const maxAge=Math.min(19,Math.max(maxAgeD+1.5,14));
+
+  const bAges=[];
+  for(let a=6;a<=maxAge;a+=0.25) bAges.push(parseFloat(a.toFixed(2)));
+  const mk=k=>bAges.map(a=>({x:a,y:parseFloat(interp(N[k],a).toFixed(3))}));
+
+  const allY=[...allData.map(d=>d.y),...mk('p25').map(d=>d.y),...mk('p90').map(d=>d.y)];
+  const minY=parseFloat((Math.min(...allY,21.5)-0.4).toFixed(1));
+  const maxY=parseFloat((Math.max(...allY,26.5)+0.3).toFixed(1));
+
+  function projFor(pd){
+    if(!showProj||pd.length<2) return null;
+    const last=pd[pd.length-1],prev=pd[pd.length-2];
+    const rate=(last.y-prev.y)/(last.x-prev.x);
+    return[{x:last.x,y:last.y},{x:parseFloat((last.x+1).toFixed(3)),y:parseFloat((last.y+rate).toFixed(3))}];
+  }
+  const projRE=projFor(pdRE),projLE=projFor(pdLE);
+  document.getElementById('projLeg').style.display=showProj?'':'none';
+
+  const datasets=[
+    {label:'top',   data:mk('p90').map(d=>({x:d.x,y:maxY})),borderWidth:0,pointRadius:0,backgroundColor:'rgba(252,235,235,.45)',fill:false,tension:.3,showLine:true},
+    {label:'>90th', data:mk('p90'),borderColor:'rgba(240,149,117,.4)',borderWidth:1,pointRadius:0,backgroundColor:'rgba(250,238,218,.45)',fill:'-1',tension:.3,showLine:true},
+    {label:'75–90', data:mk('p75'),borderColor:'rgba(191,186,90,.4)',borderWidth:1,pointRadius:0,backgroundColor:'rgba(250,238,218,.30)',fill:'-1',tension:.3,showLine:true},
+    {label:'50th',  data:mk('p50'),borderColor:'#639922',borderWidth:1.8,pointRadius:0,backgroundColor:'rgba(234,243,222,.50)',fill:'-1',tension:.3,showLine:true},
+    {label:'10–25', data:mk('p25'),borderColor:'rgba(150,196,89,.35)',borderWidth:1,pointRadius:0,backgroundColor:'rgba(234,243,222,.15)',fill:'-1',tension:.3,showLine:true},
+  ];
+
+  if(pdRE.length) datasets.push({
+    label:'RE',data:pdRE,
+    borderColor:RE_COLOR,backgroundColor:RE_COLOR2,
+    borderWidth:2.5,pointRadius:6,pointHoverRadius:8,
+    pointStyle:'circle',tension:.35,fill:false,showLine:true,order:0,
+  });
+  if(pdLE.length) datasets.push({
+    label:'LE',data:pdLE,
+    borderColor:LE_COLOR,backgroundColor:LE_COLOR2,
+    borderWidth:2.5,pointRadius:6,pointHoverRadius:8,
+    pointStyle:'rectRot',tension:.35,fill:false,showLine:true,order:0,
+  });
+  if(projRE) datasets.push({label:'RE proj',data:projRE,borderColor:RE_COLOR,backgroundColor:RE_COLOR2,borderWidth:1.5,borderDash:[5,4],pointRadius:[0,6],pointStyle:['circle','triangle'],fill:false,tension:0,order:0});
+  if(projLE) datasets.push({label:'LE proj',data:projLE,borderColor:LE_COLOR,backgroundColor:LE_COLOR2,borderWidth:1.5,borderDash:[5,4],pointRadius:[0,6],pointStyle:['circle','triangle'],fill:false,tension:0,order:0});
+
+  if(chartInst){chartInst.destroy();chartInst=null;}
+  chartInst=new Chart(document.getElementById('mainChart'),{
+    type:'scatter',data:{datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      layout:{padding:{top:22,right:26,bottom:8,left:8}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          filter:item=>['RE','LE','RE proj','LE proj'].includes(item.dataset.label),
+          callbacks:{label:ctx=>{
+            const eye=ctx.dataset.label.replace(' proj',' (projected)');
+            const a=ctx.parsed.x.toFixed(1),al=ctx.parsed.y.toFixed(2);
+            const pct=pctOf(ctx.parsed.y,ctx.parsed.x);
+            return` ${eye}  Age ${a}y · AL ${al} mm · ${pct.band} %ile — ${pct.text}`;
+          }}
+        }
+      },
+      scales:{
+        x:{type:'linear',min:6,max:Math.min(18,maxAge+.5),
+           title:{display:true,text:'Age (years)',color:'#888780',font:{size:12}},
+           grid:{color:'rgba(136,135,128,.10)'},
+           ticks:{stepSize:1,callback:v=>Number.isInteger(v)?v+'y':'',color:'#888780',font:{size:11}}},
+        y:{min:minY,max:maxY,
+           title:{display:true,text:'Axial length (mm)',color:'#888780',font:{size:12}},
+           grid:{color:'rgba(136,135,128,.10)'},
+           ticks:{callback:v=>v.toFixed(1),color:'#888780',font:{size:11}}}
+      }
+    },
+    plugins:[
+      {id:'line26',afterDraw(ch){
+        const{ctx,scales:{x,y}}=ch;
+        if(26<y.min||26>y.max) return;
+        const yp=y.getPixelForValue(26);
+        ctx.save();ctx.setLineDash([7,4]);ctx.strokeStyle='#E24B4A';ctx.lineWidth=1.5;ctx.globalAlpha=.8;
+        ctx.beginPath();ctx.moveTo(x.left,yp);ctx.lineTo(x.right,yp);ctx.stroke();
+        ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle='#E24B4A';ctx.font='600 10px sans-serif';
+        ctx.fillText('26 mm — high myopia threshold',x.left+5,yp-5);ctx.restore();
+      }},
+      {id:'zoneLabels',afterDraw(ch){
+        const{ctx,scales:{x,y}}=ch;const N2=getNorms();
+        [{yv:(interp(N2.p90,12)+maxY)/2,t:'High risk zone',c:'#A32D2D'},
+         {yv:(interp(N2.p75,12)+interp(N2.p90,12))/2,t:'Elevated',c:'#854F0B'},
+         {yv:(interp(N2.p50,12)+interp(N2.p75,12))/2,t:'Above average',c:'#5F5E5A'}
+        ].forEach(z=>{
+          const yp=y.getPixelForValue(z.yv);
+          if(yp<y.top||yp>y.bottom) return;
+          ctx.save();ctx.fillStyle=z.c;ctx.font='9px sans-serif';ctx.textAlign='right';ctx.globalAlpha=.65;
+          ctx.fillText(z.t,x.right-5,yp+4);ctx.restore();
+        });
+      }},
+      {id:'eyeKey',afterDraw(ch){
+        const{ctx,scales:{x,y}}=ch;
+        const items=[];
+        if(measurementsRE.length) items.push({c:RE_COLOR2,t:'RE (circle)'});
+        if(measurementsLE.length) items.push({c:LE_COLOR2,t:'LE (diamond)'});
+        let lx=x.left+6;
+        items.forEach(it=>{
+          ctx.save();
+          ctx.fillStyle=it.c;ctx.font='500 10px sans-serif';ctx.globalAlpha=.9;
+          ctx.beginPath();ctx.arc(lx+4,y.top+10,4,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#5F5E5A';ctx.font='10px sans-serif';
+          ctx.fillText(it.t,lx+12,y.top+14);
+          ctx.restore();
+          lx+=70;
+        });
+      }},
+      {id:'idLabel',afterDraw(ch){
+        const{ctx,scales:{x,y}}=ch;
+        if(!currentId) return;
+        ctx.save();ctx.fillStyle='#888780';ctx.font='600 10px sans-serif';ctx.textAlign='right';ctx.globalAlpha=.75;
+        ctx.fillText('ID: '+currentId,x.right-4,y.top-7);ctx.restore();
+      }}
+    ]
+  });
+}
+
+function renderPopNote(){document.getElementById('popNote').textContent=getNorms().note;}
+
+function toggleProj(){
+  showProj=!showProj;
+  document.getElementById('projBtn').textContent=showProj?'Hide projection':'Show 1-yr projection';
+  renderChart();
+}
+
+function copyReport(){
+  const id=currentId||'Unknown';
+  const dob=document.getElementById('pDob').value||'unknown';
+  const tx=document.getElementById('pTx').value;
+  const notes=document.getElementById('pNotes').value;
+  const pop=document.getElementById('pPop').value==='cn'?'East Asian / Chinese (Sanz Diez 2019)':'European (Tideman 2018)';
+
+  function eyeLines(eye){
+    const s=sortedM(eye);
+    if(!s.length) return[`  No ${eye} measurements`];
+    return s.map(m=>{
+      const age=ageAt(m.date);const pct=age!==null?pctOf(m.al,age):null;
+      return`  ${m.date}  |  AL ${m.al.toFixed(2)} mm  |  Age ${age?age.toFixed(1)+'y':'?'}  |  ${pct?pct.band+' %ile — '+pct.text:''}`;
+    });
+  }
+
+  const ovRE=overallRate('RE'),recRE=recentRate('RE');
+  const ovLE=overallRate('LE'),recLE=recentRate('LE');
+
+  const report=[
+    'Myopia Axial Length Progression Report',
+    '========================================',
+    `Patient ID     : ${id}`,
+    `DOB (m/y)      : ${dob}`,
+    `Treatment      : ${tx}`,
+    notes?`Notes          : ${notes}`:'',
+    `Reference pop. : ${pop}`,
+    '',
+    'Right eye (RE):',
+    ...eyeLines('RE'),
+    `  Overall rate: ${ovRE!==null?ovRE.toFixed(2)+' mm/yr ('+rLbl(ovRE)+')':'N/A'}`,
+    `  Recent rate:  ${recRE!==null?recRE.toFixed(2)+' mm/yr ('+rLbl(recRE)+')':'N/A'}`,
+    '',
+    'Left eye (LE):',
+    ...eyeLines('LE'),
+    `  Overall rate: ${ovLE!==null?ovLE.toFixed(2)+' mm/yr ('+rLbl(ovLE)+')':'N/A'}`,
+    `  Recent rate:  ${recLE!==null?recLE.toFixed(2)+' mm/yr ('+rLbl(recLE)+')':'N/A'}`,
+    '',
+    'References:',
+    'Tideman et al. Acta Ophthalmol. 2018;96(3):301–309. doi:10.1111/aos.13603',
+    'Sanz Diez et al. Graefes Arch. 2019;257(8):1045–1053.',
+    'Flitcroft et al. Invest Ophthalmol Vis Sci. 2019;60(3):M20–M30.',
+  ].filter(l=>l!=='').join('\n');
+
+  navigator.clipboard.writeText(report)
+    .then(()=>alert('Report copied to clipboard.'))
+    .catch(()=>alert('Copy failed. Please copy manually:\n\n'+report));
+}
+
+function refresh(){
+  renderPopNote();
+  renderEntries('RE');
+  renderEntries('LE');
+  renderStats();
+  renderChart();
+}
+
+document.getElementById('pDob').addEventListener('change',refresh);
+document.getElementById('pSex').addEventListener('change',refresh);
+
+(async()=>{await loadRecordList();})();
+</script>
+</body>
+</html>
