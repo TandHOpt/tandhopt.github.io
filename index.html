@@ -357,12 +357,27 @@ let measurementsLE=[];
 let showProj=false;
 let chartInst=null;
 
-// ── Storage ───────────────────────────────────────────────────────────────────
-async function storeGet(key){try{const r=await window.storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}}
-async function storeSet(key,val){try{await window.storage.set(key,JSON.stringify(val));return true;}catch(e){return false;}}
-async function storeDel(key){try{await window.storage.delete(key);return true;}catch(e){return false;}}
-async function storeList(prefix){try{const r=await window.storage.list(prefix);return r?r.keys:[];}catch(e){return[];}}
-function recKey(id){return'pt:'+id.toUpperCase();}
+// ── Storage — uses localStorage, works on any web host ────────────────────────
+function storeGet(key){
+  try{const v=localStorage.getItem(key);return v?JSON.parse(v):null;}catch(e){return null;}
+}
+function storeSet(key,val){
+  try{localStorage.setItem(key,JSON.stringify(val));return true;}catch(e){return false;}
+}
+function storeDel(key){
+  try{localStorage.removeItem(key);return true;}catch(e){return false;}
+}
+function storeList(prefix){
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith(prefix)) keys.push(k);
+    }
+    return keys;
+  }catch(e){return[];}
+}
+function recKey(id){return'myopia:pt:'+id.toUpperCase();}
 
 // ── DOB helpers — month-year only ────────────────────────────────────────────
 function getDobDate(){
@@ -424,12 +439,12 @@ function recentRate(eye){
 }
 
 // ── Record list ───────────────────────────────────────────────────────────────
-async function loadRecordList(){
-  const keys=await storeList('pt:');
+function loadRecordList(){
+  const keys=storeList('myopia:pt:');
   const el=document.getElementById('recordList');
   if(!keys.length){el.innerHTML='<div style="font-size:.78rem;color:var(--text3);padding:.4rem 0;">No saved records yet.</div>';return;}
   const records=[];
-  for(const k of keys){const data=await storeGet(k);if(data)records.push({key:k,id:k.replace('pt:',''),data});}
+  for(const k of keys){const data=storeGet(k);if(data)records.push({key:k,id:k.replace('myopia:pt:',''),data});}
   records.sort((a,b)=>(b.data.updatedAt||0)-(a.data.updatedAt||0));
   el.innerHTML=records.map(r=>{
     const re=r.data.measurementsRE||[],le=r.data.measurementsLE||[];
@@ -445,15 +460,15 @@ async function loadRecordList(){
   }).join('');
 }
 
-async function selectRecord(id){document.getElementById('idInput').value=id;await loadOrCreate();}
+function selectRecord(id){document.getElementById('idInput').value=id;loadOrCreate();}
 
-async function loadOrCreate(){
+function loadOrCreate(){
   const raw=document.getElementById('idInput').value.trim();
   if(!raw){alert('Please enter a patient ID.');return;}
   const id=raw.toUpperCase();
   currentId=id;
   document.getElementById('displayId').textContent=id;
-  const existing=await storeGet(recKey(id));
+  const existing=storeGet(recKey(id));
   if(existing){
     populateForm(existing);
     document.getElementById('idStatus').textContent='Loaded';
@@ -504,23 +519,23 @@ function getFormData(){
 }
 
 // ── Save / delete ─────────────────────────────────────────────────────────────
-async function saveRecord(){
+function saveRecord(){
   if(!currentId){alert('No patient ID loaded.');return;}
-  const ok=await storeSet(recKey(currentId),getFormData());
+  const ok=storeSet(recKey(currentId),getFormData());
   if(ok){const ind=document.getElementById('saveInd');ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',2000);}
   else alert('Save failed. Storage may not be available in this context.');
 }
 
-async function deleteRecord(){
+function deleteRecord(){
   if(!currentId)return;
   if(!confirm('Delete record '+currentId+'? This cannot be undone.'))return;
-  await storeDel(recKey(currentId));
+  storeDel(recKey(currentId));
   currentId=null;
   document.getElementById('patientPanel').style.display='none';
   document.getElementById('recentSection').style.display='block';
   document.getElementById('idInput').value='';
   document.getElementById('searchHint').textContent='Enter a patient ID to load an existing record or start a new one.';
-  await loadRecordList();
+  loadRecordList();
 }
 
 // ── Entries ───────────────────────────────────────────────────────────────────
@@ -782,7 +797,7 @@ function refresh(){
 document.getElementById('pDob').addEventListener('change',refresh);
 document.getElementById('pSex').addEventListener('change',refresh);
 
-(async()=>{await loadRecordList();})();
+loadRecordList();
 </script>
 </body>
 </html>
