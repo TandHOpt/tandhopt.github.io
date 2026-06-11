@@ -39,7 +39,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:
 .search-bar input:focus{border-color:var(--blue2);box-shadow:0 0 0 3px rgba(55,138,221,.13);}
 .search-bar .hint{font-size:.72rem;color:var(--text3);flex:1;}
 
-#patientPanel{display:none;}
+#patientPanel{display:none;} #patientPanel.active{display:block;} #recentSection{display:block;} #recentSection.active{display:block;}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1.1rem;}
 .field{display:flex;flex-direction:column;gap:3px;}
 .field label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
@@ -167,9 +167,14 @@ details[open] summary::before{transform:rotate(90deg);}
 .print-pname{font-size:1.05rem;font-weight:600;letter-spacing:-0.01em;color:#1a1a18;line-height:1.3;}
 .print-psub{font-size:.72rem;color:#5c5c58;}
 @media print{
-  .add-row,.btn-bar,.erow button,.cit-panel,.search-bar,.record-list,.save-indicator{display:none!important;}
+  .add-row,.btn-bar,.erow button,.cit-panel,.search-bar,.record-list,.save-indicator,#recentSection{display:none!important;}
+  #patientPanel,#patientPanel.active{display:block!important;}
   .chart-wrap{height:360px;}
   .print-header{display:flex!important;}
+  .sl{display:block!important;}
+  .eye-tabs{display:grid!important;}
+  .stats{display:grid!important;}
+  .legend{display:flex!important;}
   body{padding-top:.5rem;}
 }
 
@@ -506,8 +511,8 @@ function loadOrCreate(){
     document.getElementById('idStatus').textContent='New record';
     document.getElementById('idStatus').className='id-status id-new';
   }
-  document.getElementById('patientPanel').style.display='block';
-  document.getElementById('recentSection').style.display='none';
+  document.getElementById('patientPanel').classList.add('active');
+  document.getElementById('recentSection').classList.remove('active');
   refresh();
 }
 
@@ -559,8 +564,8 @@ function deleteRecord(){
   if(!confirm('Delete record '+currentId+'? This cannot be undone.'))return;
   storeDel(recKey(currentId));
   currentId=null;
-  document.getElementById('patientPanel').style.display='none';
-  document.getElementById('recentSection').style.display='block';
+  document.getElementById('patientPanel').classList.remove('active');
+  document.getElementById('recentSection').classList.add('active');
   document.getElementById('idInput').value='';
   document.getElementById('searchHint').textContent='Enter a patient ID to load an existing record or start a new one.';
   loadRecordList();
@@ -826,13 +831,112 @@ document.getElementById('pDob').addEventListener('change',refresh);
 document.getElementById('pSex').addEventListener('change',refresh);
 
 function printChart(){
-  // Open the current page in a new window so iframe print works correctly
-  var w = window.open(window.location.href,'_blank');
-  if(w){
-    w.onload = function(){ w.focus(); w.print(); };
-  } else {
-    window.print();
+  // Serialise the current page HTML with live chart canvas as image
+  var canvas = document.getElementById('mainChart');
+  var chartImg = canvas ? canvas.toDataURL('image/png') : null;
+
+  // Build a minimal print document from current DOM state
+  var id = currentId || '—';
+  var dob = document.getElementById('pDob').value || '—';
+  var tx  = document.getElementById('pTx').value  || '—';
+  var eye = document.getElementById('pEye').value || '—';
+  var pop = document.getElementById('pPop').value === 'cn'
+            ? 'East Asian / Chinese (Sanz Diez 2019)'
+            : 'European (Tideman 2018)';
+  var notes = document.getElementById('pNotes').value || '';
+  var ov  = overallRate('RE'), rec = recentRate('RE');
+  var ovL = overallRate('LE'), recL = recentRate('LE');
+
+  function eyeRows(eye){
+    var s = sortedM(eye);
+    if(!s.length) return '<tr><td colspan="4" style="color:#888;">No '+eye+' measurements</td></tr>';
+    return s.map(function(m){
+      var age = ageAt(m.date);
+      var pct = (age!==null&&age>=3) ? pctOf(m.al,age) : null;
+      return '<tr><td>'+m.date+'</td><td>'+m.al.toFixed(2)+' mm</td>'
+        +'<td>'+(age?age.toFixed(1)+'y':'—')+'</td>'
+        +'<td>'+(pct?pct.band+' — '+pct.text:'—')+'</td></tr>';
+    }).join('');
   }
+
+  // Get the logo src from the existing img tag
+  var logoEl = document.querySelector('.print-logo');
+  var logoSrc = logoEl ? logoEl.src : '';
+
+  var printDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>Myopia Report — '+id+'</title>'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;color:#1a1a18;padding:1.5rem 2rem;}'
+    +'.header{display:flex;align-items:center;gap:1.25rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:2px solid #1a1a18;}'
+    +'.logo{height:64px;width:auto;}'
+    +'.pname{font-size:1rem;font-weight:600;}'
+    +'.psub{font-size:.72rem;color:#5c5c58;margin-top:2px;}'
+    +'.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.25rem;}'
+    +'.meta-item{background:#f5f5f3;border-radius:6px;padding:.5rem .75rem;}'
+    +'.meta-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:2px;}'
+    +'.meta-val{font-size:.9rem;font-weight:600;}'
+    +'.section{margin-bottom:1rem;}'
+    +'.section h3{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:.4rem;border-bottom:.5px solid #ddd;padding-bottom:.25rem;}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:.75rem;}'
+    +'th{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#9a9990;text-align:left;padding:4px 8px;border-bottom:1px solid #eee;}'
+    +'td{font-size:.82rem;padding:4px 8px;border-bottom:.5px solid #f0f0f0;}'
+    +'.eye-re{color:#185FA5;font-weight:600;}'
+    +'.eye-le{color:#854F0B;font-weight:600;}'
+    +'.rate-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;}'
+    +'.rate-box{background:#f5f5f3;border-radius:6px;padding:.5rem .75rem;}'
+    +'.rate-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;}'
+    +'.rate-val{font-size:.88rem;font-weight:600;margin-top:2px;}'
+    +'.chart-img{width:100%;margin-bottom:1rem;border:0.5px solid #eee;border-radius:6px;}'
+    +'.footer{font-size:.6rem;color:#9a9990;border-top:.5px solid #ddd;padding-top:.5rem;margin-top:1rem;}'
+    +'</style></head><body>'
+    // Header
+    +'<div class="header">'
+    +(logoSrc?'<img class="logo" src="'+logoSrc+'" alt="Thompson &amp; Hardwick Optometrists" />':'')
+    +'<div><div class="pname">Thompson &amp; Hardwick Optometrists</div>'
+    +'<div class="psub">27 Park Street, Lytham, Lancashire &nbsp;·&nbsp; tandhopt.co.uk</div>'
+    +'<div class="psub">Myopia Axial Length Progression Report</div></div>'
+    +'</div>'
+    // Meta
+    +'<div class="meta">'
+    +'<div class="meta-item"><div class="meta-label">Patient ID</div><div class="meta-val">'+id+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">DOB (month/year)</div><div class="meta-val">'+dob+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">MC Treatment</div><div class="meta-val">'+tx+'</div></div>'
+    +'<div class="meta-item"><div class="meta-label">Reference</div><div class="meta-val" style="font-size:.72rem;">'+pop+'</div></div>'
+    +'</div>'
+    +(notes?'<div class="section"><h3>Notes</h3><p style="font-size:.82rem;">'+notes+'</p></div>':'')
+    // Chart
+    +(chartImg?'<img class="chart-img" src="'+chartImg+'" />':'')
+    // Measurements
+    +'<div class="rate-row">'
+    +'<div class="rate-box"><div class="rate-label">RE overall rate</div><div class="rate-val">'+(ov!==null?ov.toFixed(2)+' mm/yr ('+rLbl(ov)+')':'N/A')+'</div></div>'
+    +'<div class="rate-box"><div class="rate-label">RE recent rate</div><div class="rate-val">'+(rec!==null?rec.toFixed(2)+' mm/yr ('+rLbl(rec)+')':'N/A')+'</div></div>'
+    +'</div>'
+    +'<div class="rate-row">'
+    +'<div class="rate-box"><div class="rate-label">LE overall rate</div><div class="rate-val">'+(ovL!==null?ovL.toFixed(2)+' mm/yr ('+rLbl(ovL)+')':'N/A')+'</div></div>'
+    +'<div class="rate-box"><div class="rate-label">LE recent rate</div><div class="rate-val">'+(recL!==null?recL.toFixed(2)+' mm/yr ('+rLbl(recL)+')':'N/A')+'</div></div>'
+    +'</div>'
+    +'<div class="section"><h3>Right eye (RE) measurements</h3>'
+    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead><tbody>'
+    +eyeRows('RE')
+    +'</tbody></table></div>'
+    +'<div class="section"><h3>Left eye (LE) measurements</h3>'
+    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead><tbody>'
+    +eyeRows('LE')
+    +'</tbody></table></div>'
+    // Footer
+    +'<div class="footer">Reference: Tideman et al. Acta Ophthalmol. 2018;96(3):301-309 &nbsp;·&nbsp; '
+    +'Sanz Diez et al. Graefes Arch. 2019;257(8):1045-1053 &nbsp;·&nbsp; '
+    +'Flitcroft et al. Invest Ophthalmol Vis Sci. 2019;60(3):M20-M30 &nbsp;·&nbsp; '
+    +'Printed: '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})
+    +'</div>'
+    +'</body></html>';
+
+  var w = window.open('','_blank','width=900,height=700');
+  w.document.write(printDoc);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 800);
 }
 
 loadRecordList();
