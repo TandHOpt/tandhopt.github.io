@@ -831,112 +831,117 @@ document.getElementById('pDob').addEventListener('change',refresh);
 document.getElementById('pSex').addEventListener('change',refresh);
 
 function printChart(){
-  // Serialise the current page HTML with live chart canvas as image
   var canvas = document.getElementById('mainChart');
   var chartImg = canvas ? canvas.toDataURL('image/png') : null;
 
-  // Build a minimal print document from current DOM state
-  var id = currentId || '—';
-  var dob = document.getElementById('pDob').value || '—';
-  var tx  = document.getElementById('pTx').value  || '—';
-  var eye = document.getElementById('pEye').value || '—';
-  var pop = document.getElementById('pPop').value === 'cn'
-            ? 'East Asian / Chinese (Sanz Diez 2019)'
-            : 'European (Tideman 2018)';
+  var id    = currentId || '—';
+  var dob   = document.getElementById('pDob').value   || '—';
+  var tx    = document.getElementById('pTx').value    || '—';
   var notes = document.getElementById('pNotes').value || '';
-  var ov  = overallRate('RE'), rec = recentRate('RE');
-  var ovL = overallRate('LE'), recL = recentRate('LE');
+  var pop   = document.getElementById('pPop').value === 'cn'
+              ? 'East Asian / Chinese (Sanz Diez 2019)'
+              : 'European (Tideman 2018)';
+  var ov   = overallRate('RE'), rec  = recentRate('RE');
+  var ovL  = overallRate('LE'), recL = recentRate('LE');
 
-  function eyeRows(eye){
-    var s = sortedM(eye);
-    if(!s.length) return '<tr><td colspan="4" style="color:#888;">No '+eye+' measurements</td></tr>';
+  function eyeRows(e){
+    var s = sortedM(e);
+    if(!s.length) return '<tr><td colspan="4" style="color:#888;padding:6px 8px;">No '+e+' measurements entered</td></tr>';
     return s.map(function(m){
       var age = ageAt(m.date);
-      var pct = (age!==null&&age>=3) ? pctOf(m.al,age) : null;
+      var pct = (age!==null&&age>=3)?pctOf(m.al,age):null;
       return '<tr><td>'+m.date+'</td><td>'+m.al.toFixed(2)+' mm</td>'
         +'<td>'+(age?age.toFixed(1)+'y':'—')+'</td>'
-        +'<td>'+(pct?pct.band+' — '+pct.text:'—')+'</td></tr>';
+        +'<td>'+(pct?pct.band+' %ile — '+pct.text:'—')+'</td></tr>';
     }).join('');
   }
 
-  // Get the logo src from the existing img tag
-  var logoEl = document.querySelector('.print-logo');
+  var logoEl  = document.querySelector('.print-logo');
   var logoSrc = logoEl ? logoEl.src : '';
+  var printed = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
 
-  var printDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<title>Myopia Report — '+id+'</title>'
-    +'<style>'
+  var css = '<style>'
     +'*{box-sizing:border-box;margin:0;padding:0;}'
     +'body{font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;color:#1a1a18;padding:1.5rem 2rem;}'
-    +'.header{display:flex;align-items:center;gap:1.25rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:2px solid #1a1a18;}'
+    +'.hdr{display:flex;align-items:center;gap:1.25rem;padding-bottom:.9rem;margin-bottom:1.1rem;border-bottom:2px solid #1a1a18;}'
     +'.logo{height:64px;width:auto;}'
     +'.pname{font-size:1rem;font-weight:600;}'
-    +'.psub{font-size:.72rem;color:#5c5c58;margin-top:2px;}'
-    +'.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.25rem;}'
-    +'.meta-item{background:#f5f5f3;border-radius:6px;padding:.5rem .75rem;}'
-    +'.meta-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:2px;}'
-    +'.meta-val{font-size:.9rem;font-weight:600;}'
-    +'.section{margin-bottom:1rem;}'
-    +'.section h3{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:.4rem;border-bottom:.5px solid #ddd;padding-bottom:.25rem;}'
-    +'table{width:100%;border-collapse:collapse;margin-bottom:.75rem;}'
-    +'th{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:#9a9990;text-align:left;padding:4px 8px;border-bottom:1px solid #eee;}'
-    +'td{font-size:.82rem;padding:4px 8px;border-bottom:.5px solid #f0f0f0;}'
-    +'.eye-re{color:#185FA5;font-weight:600;}'
-    +'.eye-le{color:#854F0B;font-weight:600;}'
-    +'.rate-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;}'
-    +'.rate-box{background:#f5f5f3;border-radius:6px;padding:.5rem .75rem;}'
-    +'.rate-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;}'
-    +'.rate-val{font-size:.88rem;font-weight:600;margin-top:2px;}'
-    +'.chart-img{width:100%;margin-bottom:1rem;border:0.5px solid #eee;border-radius:6px;}'
-    +'.footer{font-size:.6rem;color:#9a9990;border-top:.5px solid #ddd;padding-top:.5rem;margin-top:1rem;}'
-    +'</style></head><body>'
-    // Header
-    +'<div class="header">'
-    +(logoSrc?'<img class="logo" src="'+logoSrc+'" alt="Thompson &amp; Hardwick Optometrists" />':'')
-    +'<div><div class="pname">Thompson &amp; Hardwick Optometrists</div>'
-    +'<div class="psub">27 Park Street, Lytham, Lancashire &nbsp;·&nbsp; tandhopt.co.uk</div>'
-    +'<div class="psub">Myopia Axial Length Progression Report</div></div>'
-    +'</div>'
-    // Meta
-    +'<div class="meta">'
-    +'<div class="meta-item"><div class="meta-label">Patient ID</div><div class="meta-val">'+id+'</div></div>'
-    +'<div class="meta-item"><div class="meta-label">DOB (month/year)</div><div class="meta-val">'+dob+'</div></div>'
-    +'<div class="meta-item"><div class="meta-label">MC Treatment</div><div class="meta-val">'+tx+'</div></div>'
-    +'<div class="meta-item"><div class="meta-label">Reference</div><div class="meta-val" style="font-size:.72rem;">'+pop+'</div></div>'
-    +'</div>'
-    +(notes?'<div class="section"><h3>Notes</h3><p style="font-size:.82rem;">'+notes+'</p></div>':'')
-    // Chart
-    +(chartImg?'<img class="chart-img" src="'+chartImg+'" />':'')
-    // Measurements
-    +'<div class="rate-row">'
-    +'<div class="rate-box"><div class="rate-label">RE overall rate</div><div class="rate-val">'+(ov!==null?ov.toFixed(2)+' mm/yr ('+rLbl(ov)+')':'N/A')+'</div></div>'
-    +'<div class="rate-box"><div class="rate-label">RE recent rate</div><div class="rate-val">'+(rec!==null?rec.toFixed(2)+' mm/yr ('+rLbl(rec)+')':'N/A')+'</div></div>'
-    +'</div>'
-    +'<div class="rate-row">'
-    +'<div class="rate-box"><div class="rate-label">LE overall rate</div><div class="rate-val">'+(ovL!==null?ovL.toFixed(2)+' mm/yr ('+rLbl(ovL)+')':'N/A')+'</div></div>'
-    +'<div class="rate-box"><div class="rate-label">LE recent rate</div><div class="rate-val">'+(recL!==null?recL.toFixed(2)+' mm/yr ('+rLbl(recL)+')':'N/A')+'</div></div>'
-    +'</div>'
-    +'<div class="section"><h3>Right eye (RE) measurements</h3>'
-    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead><tbody>'
-    +eyeRows('RE')
-    +'</tbody></table></div>'
-    +'<div class="section"><h3>Left eye (LE) measurements</h3>'
-    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead><tbody>'
-    +eyeRows('LE')
-    +'</tbody></table></div>'
-    // Footer
-    +'<div class="footer">Reference: Tideman et al. Acta Ophthalmol. 2018;96(3):301-309 &nbsp;·&nbsp; '
-    +'Sanz Diez et al. Graefes Arch. 2019;257(8):1045-1053 &nbsp;·&nbsp; '
-    +'Flitcroft et al. Invest Ophthalmol Vis Sci. 2019;60(3):M20-M30 &nbsp;·&nbsp; '
-    +'Printed: '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})
-    +'</div>'
-    +'</body></html>';
+    +'.psub{font-size:.7rem;color:#5c5c58;margin-top:2px;}'
+    +'.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.1rem;}'
+    +'.mi{background:#f5f5f3;border-radius:6px;padding:.45rem .7rem;}'
+    +'.ml{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:2px;}'
+    +'.mv{font-size:.88rem;font-weight:600;}'
+    +'.chart{width:100%;margin-bottom:1rem;border:.5px solid #eee;border-radius:6px;}'
+    +'.rates{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:1rem;}'
+    +'.rb{background:#f5f5f3;border-radius:6px;padding:.45rem .7rem;}'
+    +'.rl{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;}'
+    +'.rv{font-size:.82rem;font-weight:600;margin-top:2px;}'
+    +'.sec{margin-bottom:.9rem;}'
+    +'.sec h3{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#9a9990;margin-bottom:.35rem;border-bottom:.5px solid #ddd;padding-bottom:.2rem;}'
+    +'table{width:100%;border-collapse:collapse;}'
+    +'th{font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:#9a9990;text-align:left;padding:4px 8px;border-bottom:1px solid #eee;}'
+    +'td{font-size:.8rem;padding:4px 8px;border-bottom:.5px solid #f0f0f0;}'
+    +'.re{color:#185FA5;font-weight:600;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;}'
+    +'.le{color:#854F0B;font-weight:600;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;}'
+    +'.foot{font-size:.58rem;color:#9a9990;border-top:.5px solid #ddd;padding-top:.5rem;margin-top:1rem;line-height:1.6;}'
+    +'</style>';
 
-  var w = window.open('','_blank','width=900,height=700');
-  w.document.write(printDoc);
-  w.document.close();
-  w.focus();
-  setTimeout(function(){ w.print(); }, 800);
+  var body = '<div class="hdr">'
+    +(logoSrc?'<img class="logo" src="'+logoSrc+'">':"")
+    +'<div><div class="pname">Thompson &amp; Hardwick Optometrists</div>'
+    +'<div class="psub">27 Park Street, Lytham, Lancashire &nbsp;&middot;&nbsp; tandhopt.co.uk</div>'
+    +'<div class="psub">Myopia Axial Length Progression Report</div></div></div>'
+    +'<div class="meta">'
+    +'<div class="mi"><div class="ml">Patient ID</div><div class="mv">'+id+'</div></div>'
+    +'<div class="mi"><div class="ml">DOB (month/yr)</div><div class="mv">'+dob+'</div></div>'
+    +'<div class="mi"><div class="ml">MC Treatment</div><div class="mv">'+tx+'</div></div>'
+    +'<div class="mi"><div class="ml">Reference</div><div class="mv" style="font-size:.68rem;">'+pop+'</div></div>'
+    +'</div>'
+    +(notes?'<div class="sec"><h3>Notes</h3><p style="font-size:.82rem;margin-top:.25rem;">'+notes+'</p></div>':'')
+    +(chartImg?'<img class="chart" src="'+chartImg+'">':'')
+    +'<div class="rates">'
+    +'<div class="rb"><div class="rl re">RE overall</div><div class="rv">'+(ov!==null?ov.toFixed(2)+' mm/yr':'N/A')+'</div></div>'
+    +'<div class="rb"><div class="rl re">RE recent</div><div class="rv">'+(rec!==null?rec.toFixed(2)+' mm/yr':'N/A')+'</div></div>'
+    +'<div class="rb"><div class="rl le">LE overall</div><div class="rv">'+(ovL!==null?ovL.toFixed(2)+' mm/yr':'N/A')+'</div></div>'
+    +'<div class="rb"><div class="rl le">LE recent</div><div class="rv">'+(recL!==null?recL.toFixed(2)+' mm/yr':'N/A')+'</div></div>'
+    +'</div>'
+    +'<div class="sec"><h3><span class="re">&#9679;</span> Right eye (RE) measurements</h3>'
+    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead>'
+    +'<tbody>'+eyeRows('RE')+'</tbody></table></div>'
+    +'<div class="sec"><h3><span class="le">&#9670;</span> Left eye (LE) measurements</h3>'
+    +'<table><thead><tr><th>Date</th><th>AL</th><th>Age</th><th>Percentile</th></tr></thead>'
+    +'<tbody>'+eyeRows('LE')+'</tbody></table></div>'
+    +'<div class="foot">'
+    +'Tideman et al. Acta Ophthalmol. 2018;96(3):301-309 &nbsp;&middot;&nbsp; '
+    +'Sanz Diez et al. Graefes Arch. 2019;257(8):1045-1053 &nbsp;&middot;&nbsp; '
+    +'Flitcroft et al. Invest Ophthalmol Vis Sci. 2019;60(3):M20-M30<br>'
+    +'Printed: '+printed+' &nbsp;&middot;&nbsp; Thompson &amp; Hardwick Optometrists &nbsp;&middot;&nbsp; tandhopt.co.uk'
+    +'</div>';
+
+  // Inject a hidden print-only div into THIS document, print, then remove it
+  var existing = document.getElementById('__printFrame');
+  if(existing) existing.parentNode.removeChild(existing);
+
+  var printDiv = document.createElement('div');
+  printDiv.id = '__printFrame';
+  printDiv.innerHTML = css + body;
+  document.body.appendChild(printDiv);
+
+  // Add print style to show only this div
+  var styleEl = document.getElementById('__printStyle');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = '__printStyle';
+    styleEl.innerHTML = '@media print{body>*:not(#__printFrame){display:none!important;}#__printFrame{display:block!important;position:fixed;top:0;left:0;width:100%;background:#fff;z-index:99999;}}';
+    document.head.appendChild(styleEl);
+  }
+
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){
+      printDiv.parentNode.removeChild(printDiv);
+    }, 1000);
+  }, 300);
 }
 
 loadRecordList();
